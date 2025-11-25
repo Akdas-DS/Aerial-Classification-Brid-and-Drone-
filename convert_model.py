@@ -1,8 +1,9 @@
 import tensorflow as tf
 
-model = tf.keras.models.load_model("final_transfer_model.h5")
+# 1. Load your existing Keras model
+model = tf.keras.models.load_model("final_transfer_model.keras", compile=False)
 
-# IMPORTANT — Save in Keras v3 format (new format)
-model.save("final_transfer_model_fixed.keras", save_format="keras")
+# 2. Save it again in the new Keras format (Keras 3–friendly)
+model.save("final2_transfer_model_fixed.keras", save_format="keras")
 
-print("Model converted successfully! Saved as final_transfer_model_fixed.keras")
+print("✅ Converted and saved as final_transfer_model_fixed.keras")

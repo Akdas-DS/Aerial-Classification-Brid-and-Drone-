@@ -5,7 +5,7 @@ import numpy as np
 import io
 from tensorflow.keras.applications.resnet50 import preprocess_input as resnet_preprocess
 
-MODEL_PATH = "final_transfer_model.keras"   
+MODEL_PATH = "final_transfer_model_fixed.keras"  
 IMG_SIZE = (224, 224)
 CLASS_NAMES = ['Bird', 'Drone']
 
