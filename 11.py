@@ -5,13 +5,14 @@ import numpy as np
 import io
 from tensorflow.keras.applications.resnet50 import preprocess_input as resnet_preprocess
 
-MODEL_PATH = "final_transfer_model.h5"
+MODEL_PATH = "final_transfer_model.keras"   
 IMG_SIZE = (224, 224)
 CLASS_NAMES = ['Bird', 'Drone']
 
 @st.cache_resource(show_spinner=False)
 def load_model():
-    return tf.keras.models.load_model('final_transfer_model.h5')
+    # IMPORTANT FIX -> safe_mode=False (allows old keras models to load in keras 3)
+    return tf.keras.models.load_model(MODEL_PATH, safe_mode=False)
 
 model = load_model()
 
@@ -70,7 +71,6 @@ def preprocess_image(image):
     arr = resnet_preprocess(arr)
     return arr
 
-
 uploaded_file = st.file_uploader(
     label="Select an aerial image (JPG or PNG)", 
     type=["jpg", "jpeg", "png"],
@@ -100,7 +100,7 @@ if uploaded_file is not None:
                 st.progress(int(confidence))
                 st.json(prob_dict)
     except Exception as e:
-        st.error(f"Unable to process the image. Make sure the file is a valid JPG or PNG.")
+        st.error("Unable to process the image. Make sure the file is a valid JPG or PNG.")
 
 st.markdown("---")
-st.caption("© 2025 [Your Team/Institution]. Aerial Image Recognition System.")
+st.caption("© 2025 Mohammed Akdas Ansari. Aerial Image Recognition System.")
