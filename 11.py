@@ -1,20 +1,34 @@
 import streamlit as st
-import tensorflow as tf
 from PIL import Image
 import numpy as np
 import io
+import tflite_runtime.interpreter as tflite
 from tensorflow.keras.applications.resnet50 import preprocess_input as resnet_preprocess
 
-MODEL_PATH = "final_transfer_model_fixed.keras"  
+MODEL_PATH = "model.tflite"     # <---- Your converted TFLite model
 IMG_SIZE = (224, 224)
-CLASS_NAMES = ['Bird', 'Drone']
+CLASS_NAMES = ["Bird", "Drone"]
 
 @st.cache_resource(show_spinner=False)
 def load_model():
-    # IMPORTANT FIX -> safe_mode=False (allows old keras models to load in keras 3)
-    return tf.keras.models.load_model(MODEL_PATH, safe_mode=False)
+    interpreter = tflite.Interpreter(model_path=MODEL_PATH)
+    interpreter.allocate_tensors()
+    return interpreter
 
 model = load_model()
+
+# Get input/output tensor details
+input_details = model.get_input_details()
+output_details = model.get_output_details()
+
+
+def preprocess_image(image):
+    img = image.convert("RGB").resize(IMG_SIZE)
+    arr = np.array(img)
+    arr = np.expand_dims(arr, axis=0).astype("float32")
+    arr = resnet_preprocess(arr)
+    return arr
+
 
 st.markdown("""
     <style>
@@ -27,8 +41,7 @@ st.markdown("""
         font-weight: bold;
         border-radius: 6px;
     }
-    .stFileUploader {border-radius: 8px;}
-    h1, h2, h3, h4, h5, h6, p, span, label, .markdown-text-container {
+    h1, h2, h3, h4, h5, h6, p, span, label {
         color: #f3f3f3 !important;
     }
     .prediction {
@@ -43,36 +56,14 @@ st.markdown("""
         font-size: 20px;
         margin-bottom: 1em;
     }
-    .sidebar .sidebar-content {background:#23243a;}
     </style>
 """, unsafe_allow_html=True)
 
 st.title("Aerial Object Recognition")
-st.subheader("Bird vs. Drone Classifier")
-st.sidebar.header("Project Information")
-st.sidebar.write(
-    """Use this tool to determine if an aerial image contains a **bird** or a **drone**.
-    - State-of-the-art deep learning model.
-    - Designed for aerial surveillance and monitoring.
-    """
-)
-st.sidebar.markdown("---")
-st.sidebar.write(
-    """**Instructions:**
-    - Drop your image in the browser window or click to select.
-    - Wait for the prediction result to appear below.
-    """
-)
-
-def preprocess_image(image):
-    img = image.convert('RGB').resize((224, 224))
-    arr = np.array(img)
-    arr = np.expand_dims(arr, axis=0)
-    arr = resnet_preprocess(arr)
-    return arr
+st.subheader("Bird vs. Drone Classifier (TFLite Edition)")
 
 uploaded_file = st.file_uploader(
-    label="Select an aerial image (JPG or PNG)", 
+    "Upload an image (JPG/PNG)", 
     type=["jpg", "jpeg", "png"],
     accept_multiple_files=False
 )
@@ -80,27 +71,39 @@ uploaded_file = st.file_uploader(
 if uploaded_file is not None:
     try:
         image = Image.open(io.BytesIO(uploaded_file.read()))
-        st.image(image, use_column_width=True, caption=None)
+        st.image(image, use_column_width=True)
+
         img_array = preprocess_image(image)
-        predict_button = st.button("Classify Image")
-        if predict_button:
-            with st.spinner('Running classification...'):
-                preds = model.predict(img_array)
+
+        predict_btn = st.button("Classify Image")
+
+        if predict_btn:
+            with st.spinner("Running prediction..."):
+
+                # Set input tensor
+                model.set_tensor(input_details[0]["index"], img_array)
+
+                # Run inference
+                model.invoke()
+
+                # Get output
+                preds = model.get_tensor(output_details[0]["index"])[0]
+
                 pred_idx = int(np.argmax(preds))
                 confidence = float(np.max(preds)) * 100
 
                 st.markdown(
                     f'<div class="prediction">{CLASS_NAMES[pred_idx]}</div>'
                     f'<div class="confidence">Confidence: {confidence:.2f}%</div>',
-                    unsafe_allow_html=True
+                    unsafe_allow_html=True,
                 )
 
                 st.write("Class probabilities:")
-                prob_dict = {name: float(preds[0][i]) * 100 for i, name in enumerate(CLASS_NAMES)}
-                st.progress(int(confidence))
+                prob_dict = {CLASS_NAMES[i]: float(preds[i]) * 100 for i in range(len(CLASS_NAMES))}
                 st.json(prob_dict)
-    except Exception as e:
-        st.error("Unable to process the image. Make sure the file is a valid JPG or PNG.")
+
+    except Exception:
+        st.error("Error processing the image. Please try a valid file.")
 
 st.markdown("---")
-st.caption("© 2025 Mohammed Akdas Ansari. Aerial Image Recognition System.")
+st.caption("© 2025 Mohammed Akdas Ansari — Aerial Image Recognition System (TFLite)")
